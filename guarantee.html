@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Garantiekalender – Quittung scannen, Garantie im Kalender</title>
+<meta name="description" content="Quittung fotografieren, Garantieablauf berechnen und als .ics-Kalender mit Vorwarnung exportieren. 100% lokal im Browser.">
+<style>
+  :root{
+    --bg:#0b1220; --panel:#0f172a; --muted:#94a3b8; --text:#e5e7eb; --accent:#7c3aed; --accent2:#22d3ee;
+    --ok:#10b981; --warn:#f59e0b; --err:#ef4444; --stroke:#1f2a44;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family: ui-sans-serif,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    color:var(--text); background: radial-gradient(1200px 600px at 10% -10%, #18233a 0%, #0b1220 60%), linear-gradient(160deg,#0b1220 30%, #0b1220 90%);
+    letter-spacing:.2px;
+  }
+  header{
+    display:flex; gap:1rem; align-items:flex-start; justify-content:space-between; padding:2rem 1.25rem 0;
+    max-width:1100px; margin:0 auto;
+  }
+  .brand{
+    display:flex; gap:.9rem; align-items:center;
+  }
+  .logo{
+    width:42px; height:42px; border-radius:12px;
+    background: conic-gradient(from 210deg, var(--accent), var(--accent2));
+    box-shadow: 0 0 0 2px #ffffff10 inset, 0 10px 30px #7c3aed20;
+  }
+  h1{margin:.2rem 0 0; font-size:1.45rem}
+  .subtitle{color:var(--muted); max-width:680px}
+  .wrap{
+    max-width:1100px; margin:1.25rem auto 3rem; padding:0 1.25rem;
+  }
+  .grid{
+    display:grid; gap:1rem;
+    grid-template-columns: 1.15fr .85fr;
+  }
+  @media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
+  .card{
+    background:linear-gradient(180deg,#0f172a,#0c1530);
+    border:1px solid var(--stroke); border-radius:16px; padding:1rem 1rem 1.2rem;
+    box-shadow: 0 10px 30px rgba(16,24,40,0.25), 0 1px 0 #fff0 inset;
+  }
+  .card h2{margin:0 0 .6rem; font-size:1.05rem}
+  label{display:block; font-size:.9rem; margin:.2rem 0 .3rem}
+  input,select,button,textarea{
+    width:100%; padding:.7rem .8rem; border-radius:12px; border:1px solid #223056; background:#0b1730; color:var(--text); font-size:0.95rem;
+  }
+  input::placeholder,textarea::placeholder{color:#89a; opacity:.7}
+  .row{display:flex; gap:.6rem; flex-wrap:wrap; align-items:center}
+  .btn{background:linear-gradient(90deg,var(--accent),var(--accent2)); border:none; color:#0b1220; font-weight:700; cursor:pointer}
+  .btn.secondary{background:transparent; color:var(--text); border:1px solid #29406e}
+  .btn.ghost{background:#0b1730; border:1px dashed #29406e; color:#cbd5e1}
+  .pill{font-size:.78rem; padding:.25rem .6rem; border-radius:999px; border:1px solid #2a3d6a; color:#9fb3d8; background:#0b1730}
+  small, .muted{color:var(--muted)}
+  .status{font-weight:600}
+  .ok{color:var(--ok)} .warn{color:var(--warn)} .err{color:var(--err)}
+  .preview{
+    background:#0b1730; border:1px dashed #2a3d6a; border-radius:14px; padding:.6rem; max-height:260px; overflow:auto; white-space:pre-wrap; color:#cbd5e1
+  }
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .two{display:grid; grid-template-columns:1fr 1fr; gap:.75rem}
+  @media (max-width:600px){ .two{grid-template-columns:1fr} }
+  .hint{font-size:.85rem; color:#93a6c7}
+  .hero{
+    border:1px solid var(--stroke); border-radius:18px; padding:1rem; margin:1rem 0 1.2rem;
+    background: radial-gradient(600px 200px at 70% -20%, #5b21b600, #0f172a), linear-gradient(180deg,#0f172a,#0d1534);
+  }
+  .hero .row{justify-content:space-between}
+  video, canvas{max-width:100%; border-radius:12px; border:1px solid #223056}
+  .foot{color:#8aa0c2; font-size:.86rem; margin-top:1rem}
+  .stamp{font-size:.82rem; color:#9fb3d8}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo" aria-hidden="true"></div>
+    <div>
+      <h1>Garantiekalender</h1>
+      <div class="subtitle">Quittung/Rechnung <strong>fotografieren oder hochladen</strong> → Kaufdatum erkennen → Garantieablauf &amp; Vorwarnung als <span class="mono">.ics</span> exportieren. 100 % lokal im Browser.</div>
+    </div>
+  </div>
+  <div class="pill">Offline · DSGVO-freundlich</div>
+</header>
+
+<div class="wrap">
+  <div class="card hero">
+    <div class="row">
+      <div class="row" style="gap:.5rem">
+        <button id="openCam" class="btn"><span>📷 Kamera öffnen</span></button>
+        <button id="snap" class="btn secondary" disabled>Foto aufnehmen</button>
+        <span id="camBadge" class="pill">Kamera: aus</span>
+      </div>
+      <div class="row">
+        <label for="file" class="pill" style="cursor:pointer">oder Datei hochladen</label>
+        <input id="file" type="file" accept="image/*,application/pdf" style="display:none">
+      </div>
+    </div>
+    <div class="hint" style="margin-top:.6rem">Tipp: Lege die Quittung flach, gute diffuse Beleuchtung, Kamera parallel. Bei PDFs wird die erste Seite gelesen.</div>
+    <div class="two" style="margin-top:.8rem">
+      <video id="video" playsinline autoplay muted hidden></video>
+      <canvas id="canvas" hidden></canvas>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>1) OCR-Ergebnis</h2>
+      <div class="row"><div id="status" class="status muted">Bereit.</div></div>
+      <div id="ocrOut" class="preview" aria-live="polite"></div>
+      <div class="row" style="margin-top:.6rem">
+        <button id="runOCR" class="btn ghost" title="Falls nötig, OCR erneut auf letztem Bild ausführen">OCR erneut</button>
+        <small class="hint">Wir durchsuchen das Ergebnis nach Datenmustern (DD.MM.YYYY, YYYY-MM-DD, etc.).</small>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2) Daten prüfen &amp; Garantie festlegen</h2>
+      <div class="two">
+        <div>
+          <label>Produkt (optional)</label>
+          <input id="product" placeholder="z. B. Laptop, Waschmaschine" autocomplete="off">
+        </div>
+        <div>
+          <label>Händler/Shop (falls erkennbar)</label>
+          <input id="merchant" placeholder="z. B. MediaMarkt, Amazon" autocomplete="organization">
+        </div>
+        <div>
+          <label>Kaufdatum</label>
+          <input id="purchaseDate" type="date" required>
+        </div>
+        <div>
+          <label>Garantiezeit (Monate)</label>
+          <input id="warrantyMonths" type="number" min="1" max="120" value="24">
+        </div>
+        <div>
+          <label>Vorwarnung</label>
+          <select id="leadDays">
+            <option value="7">7 Tage vorher</option>
+            <option value="14">14 Tage vorher</option>
+            <option value="30" selected>30 Tage vorher</option>
+            <option value="60">60 Tage vorher</option>
+            <option value="90">90 Tage vorher</option>
+          </select>
+        </div>
+        <div>
+          <label>Notiz (optional)</label>
+          <input id="note" placeholder="Seriennr., Bestellnr., Besonderheiten">
+        </div>
+      </div>
+      <div class="row" style="margin-top:.7rem">
+        <button id="calcBtn" class="btn secondary">Ablauf berechnen</button>
+        <span id="calcInfo" class="stamp"></span>
+      </div>
+      <hr style="border:none;border-top:1px solid #223056; margin:.9rem 0">
+      <div class="row">
+        <button id="exportICS" class="btn">📅 .ics exportieren</button>
+        <button id="clearBtn" class="btn ghost">Felder leeren</button>
+        <small class="hint">Der Kalendertermin enthält einen <strong>VALARM</strong> (Vorwarnung), läuft als ganztägiges Ereignis am Ablaufdatum.</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <strong>Hinweise:</strong> OCR ist fehleranfällig bei Schatten/Neigung. Kaufdatum wird heuristisch aus gängigen Formaten gewählt – prüfe es kurz. Die .ics-Datei ist „floating“ (ganztägig), kompatibel mit Apple/Google/Outlook-Kalendern.
+  </div>
+</div>
+
+<script>
+  // ---------- Helpers ----------
+  const $ = sel => document.querySelector(sel);
+  const statusEl = $('#status'), ocrOut = $('#ocrOut'), camBadge = $('#camBadge');
+  const video = $('#video'), canvas = $('#canvas');
+  const fileEl = $('#file'), openCamBtn = $('#openCam'), snapBtn = $('#snap'), runOCRBtn = $('#runOCR');
+  const productEl = $('#product'), merchantEl = $('#merchant'), purchaseDateEl = $('#purchaseDate');
+  const warrantyMonthsEl = $('#warrantyMonths'), leadDaysEl = $('#leadDays'), noteEl = $('#note');
+  const calcBtn = $('#calcBtn'), calcInfo = $('#calcInfo'), exportBtn = $('#exportICS'), clearBtn = $('#clearBtn');
+  let stream = null, lastBlob = null, lastText = '';
+
+  function setStatus(text, cls='muted'){ statusEl.className = 'status ' + cls; statusEl.textContent = text; }
+
+  function toISODate(d){
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${da}`;
+  }
+  function parseDateStringAny(s){
+    // Accepts DD.MM.YYYY, DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY, YY/MM/DD etc.
+    const patterns = [
+      /(\b\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{4})/g,          // 31.12.2024
+      /(\b\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/g,          // 2024-12-31
+      /(\b\d{1,2})\s([A-Za-z]{3,})\s(\d{4})/g               // 31 Dec 2024
+    ];
+    const monthMap = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12,
+                      mär:3,maerz:3,marz:3,mai:5,juni:6,juli:7,okt:10,dez:12,august:8,april:4,september:9,oktober:10,november:11,dezember:12};
+    let candidates = [];
+    patterns.forEach((re, idx)=>{
+      let m;
+      while((m = re.exec(s))!==null){
+        let y, mo, d;
+        if(idx===0){ d=parseInt(m[1]); mo=parseInt(m[2]); y=parseInt(m[3]); }
+        if(idx===1){ y=parseInt(m[1]); mo=parseInt(m[2]); d=parseInt(m[3]); }
+        if(idx===2){
+          d=parseInt(m[1]); const key=m[2].toLowerCase().replace('ä','ae').replace('ö','oe').replace('ü','ue');
+          mo = monthMap[key]||null; y=parseInt(m[3]);
+        }
+        if(!y||!mo||!d) continue;
+        if(y<2000||y>2035) continue; // Plausibles Fenster
+        if(mo<1||mo>12||d<1||d>31) continue;
+        const date = new Date(y, mo-1, d);
+        if(date.getMonth()!==mo-1) continue;
+        candidates.push(date);
+      }
+    });
+    // Heuristik: Nimm die früheste plausible, weil Kaufdatum oft oben/früh erscheint – sonst erste gefundene
+    if(candidates.length) candidates.sort((a,b)=>a-b);
+    return candidates[0]||null;
+  }
+
+  function addMonthsSafe(date, months){
+    const d = new Date(date.getTime());
+    const day = d.getDate();
+    d.setMonth(d.getMonth()+months);
+    // End-of-month handling
+    if(d.getDate() < day){
+      d.setDate(0); // letzter Tag des Vormonats
+    }
+    return d;
+  }
+
+  function sanitizeLines(text){
+    const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    return lines;
+  }
+
+  function guessMerchant(text){
+    const lines = sanitizeLines(text);
+    // Heuristik: erster kräftiger / reiner Text ohne Summenzeilen
+    const skip = /(summe|total|visa|mastercard|ust|mwst|kredit|steuer|zahlbetrag|betrag|change|rückgeld|cash|bar|karte|invoice|rechnungsnr|order|shipping|lieferung)/i;
+    for(let i=0;i<Math.min(lines.length, 12); i++){
+      const L = lines[i];
+      if(L.length<3) continue;
+      if(/\d/.test(L)) continue;
+      if(skip.test(L)) continue;
+      if(L.toUpperCase()===L && L.replace(/\W/g,'').length>=3){ return L.slice(0,64); }
+      if(i<3 && L.replace(/\W/g,'').length>=3) return L.slice(0,64);
+    }
+    return '';
+  }
+
+  function icsEscape(s){ return String(s).replace(/\\|;|,|\n/g, m=>({'\\':'\\\\',';':'\\;','.':'.',',':'\\,','\n':'\\n'}[m])); }
+
+  function buildICS({product,merchant,purchaseISO,expiryISO,leadDays,note}){
+    // All-day event on expiry date + VALARM
+    const uid = 'gk-' + Math.random().toString(36).slice(2) + '@garantiekalender';
+    const dtstamp = new Date();
+    const DTSTAMP = dtstamp.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z';
+    const DTSTART = expiryISO.replace(/-/g,'');
+    const summary = `Garantie endet: ${product||'Produkt'}`;
+    const desc = [
+      product?`Produkt: ${product}`:null,
+      merchant?`Händler: ${merchant}`:null,
+      purchaseISO?`Kaufdatum: ${purchaseISO}`:null,
+      note?`Notiz: ${note}`:null
+    ].filter(Boolean).join('\\n');
+
+    return [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Garantiekalender//DE',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:${uid}`,
+      `DTSTAMP:${DTSTAMP}`,
+      `SUMMARY:${icsEscape(summary)}`,
+      `DESCRIPTION:${icsEscape(desc)}`,
+      `DTSTART;VALUE=DATE:${DTSTART}`,
+      'DURATION:P1D',
+      'BEGIN:VALARM',
+      `TRIGGER:-P${leadDays}D`,
+      'ACTION:DISPLAY',
+      `DESCRIPTION:${icsEscape('Garantie läuft bald ab')}`,
+      'END:VALARM',
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+  }
+
+  function download(filename, text){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], {type:'text/calendar'}));
+    a.download = filename; a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  // ---------- Camera ----------
+  async function openCamera(){
+    if(stream){ stopCamera(); }
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080}}, audio:false
+      });
+      video.srcObject = stream; video.hidden = false; snapBtn.disabled = true;
+      camBadge.textContent = 'Kamera: an';
+      setStatus('Kamera aktiv. Quittung flach, gut beleuchtet ins Bild.', 'muted');
+      // Enable snap only when metadata ready
+      video.onloadedmetadata = ()=>{ snapBtn.disabled = false; };
+    }catch(err){
+      setStatus('Kamera nicht verfügbar: '+err.message, 'err');
+    }
+  }
+  function stopCamera(){
+    if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+    video.hidden = true; snapBtn.disabled = true; camBadge.textContent='Kamera: aus';
+  }
+
+  openCamBtn.addEventListener('click', ()=>{ if(stream){ stopCamera(); setStatus('Kamera gestoppt.','muted'); } else { openCamera(); } });
+  snapBtn.addEventListener('click', async ()=>{
+    if(!stream) return;
+    const w = video.videoWidth || 1280, h = video.videoHeight || 720;
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d'); ctx.drawImage(video,0,0,w,h);
+    canvas.hidden = false;
+    canvas.toBlob(async (blob)=>{ if(blob){ lastBlob = blob; await runOCR(blob); } }, 'image/jpeg', 0.95);
+  });
+
+  // ---------- File Upload ----------
+  fileEl.addEventListener('change', async e=>{
+    const f = e.target.files[0]; if(!f) return;
+    if(f.type==='application/pdf'){
+      // Browser zeigt Bilder aus PDF nicht direkt -> Hinweis: Für 1-Tages-Scope: bitte Screenshot/Foto nutzen
+      setStatus('PDF erkannt. Bitte – für bestes Ergebnis – ein Bild/Screenshot der ersten Seite hochladen.', 'warn');
+      // Option: einfache PDF-Handling weggelassen, um 1-Tages-Umsetzung schlank zu halten
+      return;
+    }
+    lastBlob = f; await runOCR(f);
+  });
+
+  runOCRBtn.addEventListener('click', async ()=>{
+    if(!lastBlob){ setStatus('Kein Bild vorhanden. Bitte Kamera nutzen oder Datei hochladen.', 'warn'); return; }
+    await runOCR(lastBlob);
+  });
+
+  // ---------- OCR ----------
+  async function runOCR(blob){
+    setStatus('OCR läuft… (Tesseract.js)', 'muted');
+    ocrOut.textContent = '';
+    try{
+      const { data:{ text } } = await Tesseract.recognize(blob, 'eng', {
+        // Whitelist frei lassen – Rechnungen brauchen Buchstaben & Zahlen
+      });
+      lastText = text;
+      ocrOut.textContent = text || '(kein Text erkannt)';
+      setStatus('OCR fertig. Heuristiken für Kaufdatum/Händler laufen…', 'ok');
+
+      // Auto-fill merchant / date
+      const d = parseDateStringAny(text);
+      if(d){ purchaseDateEl.value = toISODate(d); }
+      const m = guessMerchant(text);
+      if(m){ merchantEl.value = m; }
+
+      // Fokus auf Produktfeld für schnelle Eingabe
+      productEl.focus();
+    }catch(err){
+      console.error(err);
+      setStatus('OCR-Fehler: '+err.message, 'err');
+    }
+  }
+
+  // ---------- Calculate & Export ----------
+  calcBtn.addEventListener('click', ()=>{
+    const pISO = purchaseDateEl.value;
+    const months = parseInt(warrantyMonthsEl.value||'0',10);
+    if(!pISO || !months || months<1){ calcInfo.textContent='Bitte Kaufdatum & Monate prüfen.'; return; }
+    const p = new Date(pISO+'T00:00:00');
+    const exp = addMonthsSafe(p, months);
+    calcInfo.textContent = `Ablauf am ${exp.toLocaleDateString()}  (berechnet aus ${p.toLocaleDateString()} + ${months} Monate)`;
+  });
+
+  exportBtn.addEventListener('click', ()=>{
+    const pISO = purchaseDateEl.value;
+    const months = parseInt(warrantyMonthsEl.value||'0',10);
+    if(!pISO || !months || months<1){ setStatus('Fehlende Angabe: Kaufdatum oder Monate.', 'err'); return; }
+    const p = new Date(pISO+'T00:00:00');
+    const exp = addMonthsSafe(p, months);
+    const expiryISO = toISODate(exp);
+
+    const ics = buildICS({
+      product: productEl.value.trim(),
+      merchant: merchantEl.value.trim(),
+      purchaseISO: pISO,
+      expiryISO,
+      leadDays: parseInt(leadDaysEl.value,10),
+      note: noteEl.value.trim()
+    });
+
+    const base = productEl.value.trim() || 'Produkt';
+    download(`Garantie_${base.replace(/\s+/g,'_')}_${expiryISO}.ics`, ics);
+    setStatus('ICS exportiert. Im Kalender importieren – fertig.', 'ok');
+  });
+
+  clearBtn.addEventListener('click', ()=>{
+    productEl.value=''; merchantEl.value=''; purchaseDateEl.value='';
+    warrantyMonthsEl.value='24'; leadDaysEl.value='30'; noteEl.value='';
+    calcInfo.textContent=''; setStatus('Felder zurückgesetzt.','muted');
+  });
+
+  window.addEventListener('beforeunload', stopCamera);
+</script>
+</body>
+</html>
